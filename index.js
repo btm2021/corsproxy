@@ -1,9 +1,13 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import fetch from 'node-fetch';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
+
+// Enable compression
+app.use(compression());
 
 // Enable CORS cho tất cả requests
 app.use(cors());
