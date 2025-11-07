@@ -1,72 +1,69 @@
-import http from "http";
-import https from "https";
+import express from 'express';
+import cors from 'cors';
+import fetch from 'node-fetch';
 
-const httpsAgent = new https.Agent({ keepAlive: true });
-const httpAgent = new http.Agent({ keepAlive: true });
+const app = express();
+const PORT = process.env.PORT || 8000;
 
-function safeDecode(url) {
+// Enable CORS cho tất cả requests
+app.use(cors());
+
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'CORS Proxy for CCXT is running',
+    usage: 'GET /<encoded-url>'
+  });
+});
+
+// CORS proxy endpoint
+app.get('/*', async (req, res) => {
   try {
-    let d = decodeURIComponent(url);
-    // Nếu vẫn còn ký tự %, decode thêm lần nữa
-    if (/%[0-9A-F]{2}/i.test(d)) {
-      d = decodeURIComponent(d);
+    // Lấy URL từ path (bỏ dấu / đầu tiên)
+    const targetUrl = decodeURIComponent(req.url.slice(1));
+    
+    if (!targetUrl || !targetUrl.startsWith('http')) {
+      return res.status(400).json({ 
+        error: 'Invalid URL',
+        message: 'Please provide a valid encoded URL'
+      });
     }
-    return d;
-  } catch {
-    return url;
-  }
-}
 
-const server = http.createServer(async (req, res) => {
-  let target = req.url.slice(1);
-
-  const CORS = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-    "Access-Control-Allow-Headers": "*",
-  };
-
-  if (req.method === "OPTIONS") {
-    res.writeHead(200, CORS);
-    return res.end();
-  }
-
-  // ✅ FIX: decode encode 1/2 lần của CCXT
-  target = safeDecode(target);
-
-  if (!target.startsWith("http")) {
-    res.writeHead(400, CORS);
-    return res.end("Invalid target URL: " + target);
-  }
-
-  try {
-    const agent = target.startsWith("https") ? httpsAgent : httpAgent;
-
-    const headers = { ...req.headers };
-    delete headers.host;
-
-    const upstream = await fetch(target, {
+    // Forward request đến target URL
+    const response = await fetch(targetUrl, {
       method: req.method,
-      headers,
-      body: ["GET", "HEAD"].includes(req.method) ? undefined : req,
-      redirect: "follow",
-      // ✅ SỬ DỤNG agent — KHÔNG dùng dispatcher
-      agent,
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/json, text/plain, */*'
+      }
     });
 
-    const ab = await upstream.arrayBuffer();
-    const body = Buffer.from(ab);
+    // Copy response headers
+    const contentType = response.headers.get('content-type');
+    if (contentType) {
+      res.setHeader('Content-Type', contentType);
+    }
 
-    const responseHeaders = {};
-    upstream.headers.forEach((v, k) => (responseHeaders[k] = v));
-    Object.assign(responseHeaders, CORS);
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    res.writeHead(upstream.status, responseHeaders);
-    res.end(body);
-  } catch (err) {
-    res.writeHead(500, CORS);
-    res.end("Proxy Error: " + err.toString());
+    // Forward response
+    const data = await response.text();
+    res.status(response.status).send(data);
+
+  } catch (error) {
+    console.error('Proxy error:', error);
+    res.status(500).json({ 
+      error: 'Proxy error',
+      message: error.message 
+    });
   }
 });
 
-server.listen(process.env.PORT || 3000);
+app.listen(PORT, () => {
+  console.log(`CORS Proxy server running on port ${PORT}`);
+});
+``
