@@ -5,7 +5,7 @@ const httpsAgent = new https.Agent({ keepAlive: true });
 const httpAgent = new http.Agent({ keepAlive: true });
 
 const server = http.createServer(async (req, res) => {
-  const target = req.url.slice(1); // remove leading "/"
+  let target = req.url.slice(1); // remove "/"
 
   const CORS = {
     "Access-Control-Allow-Origin": "*",
@@ -20,42 +20,42 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
 
-  // ✅ Validate target URL
-  if (!target || !target.startsWith("http")) {
+  // ✅ FIX URL encode từ CCXT
+  try {
+    target = decodeURIComponent(target);
+  } catch (err) {
+    res.writeHead(400, CORS);
+    return res.end("Invalid Encoded URL");
+  }
+
+  // ✅ Validate URL
+  if (!target.startsWith("http")) {
     res.writeHead(400, CORS);
     return res.end("Invalid target URL: " + target);
   }
 
   try {
-    // clone headers
     const headers = { ...req.headers };
     delete headers["host"];
 
     const agent = target.startsWith("https") ? httpsAgent : httpAgent;
 
-    const fetchOptions = {
+    const upstream = await fetch(target, {
       method: req.method,
       headers,
       body: ["GET", "HEAD"].includes(req.method) ? undefined : req,
       redirect: "follow",
-      dispatcher: agent, // Node fetch hỗ trợ option này
-    };
+      dispatcher: agent,
+    });
 
-    // ✅ Fetch upstream
-    const upstream = await fetch(target, fetchOptions);
-
-    // Get response body as ArrayBuffer
     const ab = await upstream.arrayBuffer();
     const body = Buffer.from(ab);
 
-    // Copy headers
     const responseHeaders = {};
     upstream.headers.forEach((v, k) => (responseHeaders[k] = v));
 
-    // Add CORS
     Object.assign(responseHeaders, CORS);
 
-    // ✅ Return upstream response
     res.writeHead(upstream.status, responseHeaders);
     return res.end(body);
   } catch (error) {
