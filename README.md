@@ -1,39 +1,67 @@
-# CORS Proxy cho CCXT
+# TradingView Chart Server
 
-CORS proxy đơn giản để sử dụng với thư viện CCXT, deploy trên Koyeb.
+Backend server cho save/load TradingView charts với SQLite database.
 
-## Cách sử dụng
+## Cài đặt
 
-Thư viện CCXT sẽ gọi proxy theo format:
-```
-https://your-app.koyeb.app/<encoded-url>
+```bash
+npm install
 ```
 
-Ví dụ:
+## Chạy local
+
+```bash
+npm start
 ```
-https://regional-nicole-mycop-df54b780.koyeb.app/https%3A%2F%2Fopen-api.bingx.com%2FopenApi%2Fswap%2Fv2%2Fquote%2Fcontracts%3Ftimestamp%3D1762546874044
-```
+
+Server sẽ chạy ở `http://localhost:3000`
 
 ## Deploy lên Koyeb
 
 1. Push code lên GitHub repository
 2. Tạo app mới trên Koyeb
-3. Connect với GitHub repository
-4. Chọn build type: **Buildpack**
-5. Port: **8000** (hoặc để Koyeb tự detect)
+3. Chọn GitHub repository
+4. Build command: `npm install`
+5. Run command: `npm start`
+6. Port: `3000`
+7. Deploy!
+
+## Deploy lên Railway
+
+1. Push code lên GitHub
+2. Tạo project mới trên Railway
+3. Connect GitHub repository
+4. Railway sẽ tự động detect và deploy
+
+## Deploy lên Render
+
+1. Push code lên GitHub
+2. Tạo Web Service mới
+3. Connect repository
+4. Build command: `npm install`
+5. Start command: `npm start`
 6. Deploy!
 
-## Local Development
+## API Endpoints
 
-```bash
-npm install
-npm start
-```
+### GET /charts
+Lấy danh sách tất cả charts của user
+- Query params: `client` hoặc `user` (user ID)
 
-Server sẽ chạy tại `http://localhost:8000`
+### GET /charts/:chartId
+Lấy nội dung của một chart
+- Query params: `client` hoặc `user` (user ID)
 
-## Test
+### POST /charts
+Lưu chart (tạo mới hoặc update)
+- Query params: `client` hoặc `user` (user ID)
+- Body: `{ id?, name, content, symbol?, resolution? }`
 
-```bash
-curl "http://localhost:8000/https%3A%2F%2Fapi.example.com%2Fdata"
-```
+### DELETE /charts/:chartId
+Xóa chart
+- Query params: `client` hoặc `user` (user ID)
+
+## Environment Variables
+
+- `PORT`: Port để chạy server (default: 3000)
+- `DB_PATH`: Đường dẫn đến SQLite database file (default: charts.db)
